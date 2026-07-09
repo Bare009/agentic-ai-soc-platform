@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-07-10T14:26:50.334+0000",
+  "rule": {
+    "level": 7,
+    "description": "Integrity checksum changed.",
+    "id": "550",
+    "mitre": {
+      "id": ["T1565.001"],
+      "tactic": ["Impact"],
+      "technique": ["Stored Data Manipulation"]
+    },
+    "firedtimes": 1,
+    "mail": false,
+    "groups": ["ossec", "syscheck", "syscheck_entry_modified", "syscheck_file"],
+    "pci_dss": ["11.5"],
+    "gdpr": ["II_5.1.f"]
+  },
+  "agent": {
+    "id": "001",
+    "name": "victim-kali",
+    "ip": "10.0.0.50"
+  },
+  "manager": {
+    "name": "wazuh-manager"
+  },
+  "id": "1720621610.334870",
+  "full_log": "File '/etc/passwd' modified\nMode: realtime\nChanged attributes: size,mtime,md5,sha1,sha256\nSize changed from '2841' to '2903'",
+  "syscheck": {
+    "path": "/etc/passwd",
+    "mode": "realtime",
+    "event": "modified",
+    "size_before": "2841",
+    "size_after": "2903",
+    "perm_after": "rw-r--r--",
+    "uid_after": "0",
+    "gid_after": "0",
+    "md5_before": "1f2e3d4c5b6a7980a1b2c3d4e5f60718",
+    "md5_after": "9a8b7c6d5e4f30211223344556677889",
+    "sha1_after": "b7a1c2d3e4f5061728394a5b6c7d8e9f0a1b2c3d",
+    "changed_attributes": ["size", "mtime", "md5", "sha1", "sha256"]
+  },
+  "decoder": {
+    "name": "syscheck_integrity_changed"
+  },
+  "data": {},
+  "location": "syscheck"
+}

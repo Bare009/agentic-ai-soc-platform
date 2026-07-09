@@ -90,5 +90,9 @@ volumes:
   mongo-data:
 
 networks:
+  # The main stack OWNS this network (fixed name so the separate Wazuh compose
+  # can attach to it as `external`). This means `docker compose up` works on its
+  # own during development — no manual `docker network create` needed.
   soc-network:
+    name: soc-network
     driver: bridge

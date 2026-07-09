@@ -10,6 +10,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Header
 from pydantic import BaseModel
@@ -79,17 +80,78 @@ app = FastAPI(
 # Helpers
 # ---------------------------------------------------------------------------
 
-def normalize_wazuh_alert(wazuh: WazuhAlert) -> NormalizedAlert:
+def _dig(d: Any, *path: str) -> Any:
+    """Safely walk a nested dict path, returning None if any hop is missing/non-dict."""
+    cur = d
+    for key in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(key)
+    return cur
+
+
+def _first_str(*values: Any) -> str:
+    """Return the first non-empty string among the candidates, else ''."""
+    for v in values:
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
+
+
+def normalize_wazuh_alert(body: dict) -> NormalizedAlert:
     """
     Convert a raw Wazuh alert into our internal normalized schema.
 
-    Extracts source IP, user, hostname etc. from the nested Wazuh structure.
+    Handles both the direct Wazuh alert format and the integration-wrapped
+    format where the alert may be nested. Real Wazuh alerts vary their field
+    layout by decoder (Linux sshd/sudo vs. Windows eventdata vs. FIM), so we
+    extract each field from an ordered list of candidate paths defensively.
     """
+    # Wazuh integrations sometimes wrap the alert under an "alert" key
+    if "alert" in body and isinstance(body["alert"], dict):
+        alert_data = body["alert"]
+    else:
+        alert_data = body
+
+    # Parse the Wazuh alert structure (extra top-level keys like manager,
+    # predecoder, decoder, syscheck are ignored by the model but preserved
+    # below in raw_payload).
+    wazuh = WazuhAlert(**alert_data)
+
+    # Wazuh puts different fields in `data` depending on the alert type.
+    data = wazuh.data or {}
+    win_event = _dig(data, "win", "eventdata") or {}
+
+    # Source IP: Linux decoders use srcip/src_ip/srcaddr; Windows uses
+    # win.eventdata.ipAddress.
+    source_ip = _first_str(
+        data.get("srcip"),
+        data.get("src_ip"),
+        data.get("srcaddr"),
+        win_event.get("ipAddress"),
+    )
+
+    # User: the *acting* account identity, so correlation can thread a single
+    # user across login -> privilege-escalation. srcuser wins (it's the invoker
+    # on sudo/su); dstuser is the fallback for plain login events that only
+    # record the account logged into. Windows uses targetUserName.
+    user = _first_str(
+        data.get("srcuser"),
+        data.get("dstuser"),
+        data.get("user"),
+        win_event.get("targetUserName"),
+        win_event.get("subjectUserName"),
+    )
+
+    # Destination IP: explicit dstip if present, otherwise the monitored
+    # agent's own IP (the host being attacked).
+    dest_ip = _first_str(data.get("dstip"), data.get("dst_ip")) or wazuh.agent.ip
+
     return NormalizedAlert(
         timestamp=_parse_wazuh_timestamp(wazuh.timestamp),
-        source_ip=wazuh.data.get("srcip", ""),
-        dest_ip=wazuh.data.get("dstip", wazuh.agent.ip),
-        user=wazuh.data.get("dstuser", wazuh.data.get("srcuser", "")),
+        source_ip=source_ip,
+        dest_ip=dest_ip,
+        user=user,
         hostname=wazuh.agent.name,
         rule_id=wazuh.rule.id,
         rule_level=wazuh.rule.level,
@@ -97,7 +159,7 @@ def normalize_wazuh_alert(wazuh: WazuhAlert) -> NormalizedAlert:
         rule_groups=wazuh.rule.groups,
         location=wazuh.location,
         full_log=wazuh.full_log,
-        raw_payload=wazuh.model_dump(),
+        raw_payload=alert_data,
     )
 
 
@@ -106,7 +168,10 @@ def _parse_wazuh_timestamp(ts: str) -> datetime:
     if not ts:
         return datetime.now(timezone.utc)
     try:
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        # Wazuh uses formats like: 2026-07-09T17:30:00.000+0000
+        # or 2026-07-09T17:30:00+00:00
+        clean = ts.replace("+0000", "+00:00").replace("Z", "+00:00")
+        return datetime.fromisoformat(clean)
     except (ValueError, AttributeError):
         return datetime.now(timezone.utc)
 
@@ -181,8 +246,7 @@ async def receive_wazuh_alert(
 
     # --- Normalize ---
     try:
-        wazuh_alert = WazuhAlert(**body)
-        normalized = normalize_wazuh_alert(wazuh_alert)
+        normalized = normalize_wazuh_alert(body)
     except Exception as exc:
         logger.error("Failed to normalize Wazuh alert: %s", exc)
         metrics["alerts_dlq"] += 1
@@ -202,9 +266,11 @@ async def receive_wazuh_alert(
     metrics["alerts_parsed"] += 1
 
     logger.info(
-        "Alert ingested: id=%s src_ip=%s rule='%s' level=%d",
+        "Alert ingested: id=%s src_ip=%s user=%s host=%s rule='%s' level=%d",
         normalized.alert_id,
         normalized.source_ip,
+        normalized.user,
+        normalized.hostname,
         normalized.rule_description,
         normalized.rule_level,
     )

@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-07-10T14:25:37.905+0000",
+  "rule": {
+    "level": 8,
+    "description": "First time user executed sudo.",
+    "id": "5402",
+    "mitre": {
+      "id": ["T1548.003"],
+      "tactic": ["Privilege Escalation", "Defense Evasion"],
+      "technique": ["Sudo and Sudo Caching"]
+    },
+    "firedtimes": 1,
+    "mail": false,
+    "groups": ["syslog", "sudo", "privilege_escalation"],
+    "pci_dss": ["10.2.5", "10.2.2"],
+    "gdpr": ["IV_32.2"]
+  },
+  "agent": {
+    "id": "001",
+    "name": "victim-kali",
+    "ip": "10.0.0.50"
+  },
+  "manager": {
+    "name": "wazuh-manager"
+  },
+  "id": "1720621537.905221",
+  "full_log": "Jul 10 14:25:37 victim-kali sudo: baduser : TTY=pts/1 ; PWD=/home/baduser ; USER=root ; COMMAND=/bin/bash",
+  "predecoder": {
+    "program_name": "sudo",
+    "timestamp": "Jul 10 14:25:37",
+    "hostname": "victim-kali"
+  },
+  "decoder": {
+    "parent": "sudo",
+    "name": "sudo"
+  },
+  "data": {
+    "srcuser": "baduser",
+    "dstuser": "root",
+    "tty": "pts/1",
+    "pwd": "/home/baduser",
+    "command": "/bin/bash"
+  },
+  "location": "/var/log/auth.log"
+}

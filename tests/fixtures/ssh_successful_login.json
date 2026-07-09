@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-07-10T14:24:02.117+0000",
+  "rule": {
+    "level": 3,
+    "description": "sshd: authentication success.",
+    "id": "5715",
+    "mitre": {
+      "id": ["T1078"],
+      "tactic": ["Defense Evasion", "Persistence", "Privilege Escalation", "Initial Access"],
+      "technique": ["Valid Accounts"]
+    },
+    "firedtimes": 1,
+    "mail": false,
+    "groups": ["syslog", "sshd", "authentication_success"],
+    "pci_dss": ["10.2.5"],
+    "gdpr": ["IV_32.2"]
+  },
+  "agent": {
+    "id": "001",
+    "name": "victim-kali",
+    "ip": "10.0.0.50"
+  },
+  "manager": {
+    "name": "wazuh-manager"
+  },
+  "id": "1720621442.117904",
+  "full_log": "Jul 10 14:24:02 victim-kali sshd[12360]: Accepted password for baduser from 10.0.0.99 port 54390 ssh2",
+  "predecoder": {
+    "program_name": "sshd",
+    "timestamp": "Jul 10 14:24:02",
+    "hostname": "victim-kali"
+  },
+  "decoder": {
+    "parent": "sshd",
+    "name": "sshd"
+  },
+  "data": {
+    "srcip": "10.0.0.99",
+    "srcport": "54390",
+    "dstuser": "baduser"
+  },
+  "location": "/var/log/auth.log"
+}

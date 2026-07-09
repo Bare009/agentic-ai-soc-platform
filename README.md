@@ -16,3 +16,41 @@ This repository uses a flat monorepo structure to easily manage the multiple ind
 - `docs/`: Documentation covering the system design, architecture diagrams, and API specifications.
 - `tests/`: End-to-end integration and component unit tests.
 - `.github/`: CI/CD workflows and actions.
+
+## Running locally (development)
+
+The main stack owns the shared `soc-network`, so no manual network setup is needed:
+
+```bash
+cp .env.example .env          # fill in keys as later phases need them
+docker compose up --build -d  # ingestion (:8000), worker, redis, mongodb
+curl -s http://localhost:8000/api/v1/health | python3 -m json.tool
+```
+
+### Driving the pipeline with realistic Wazuh alerts
+
+Until the live Wazuh + Kali-agent setup is wired for the final demo (see
+`infrastructure/wazuh/README.md`), the pipeline is developed and tested against
+genuine Wazuh alert JSON sent over HTTP:
+
+```bash
+# Benign case (single failed login then success) — expect false positive
+python tests/send_alerts.py alice
+
+# Attack case (brute-force burst -> login -> sudo priv-esc, same IP/user)
+python tests/send_alerts.py bob --count 6
+
+# Send a single canonical fixture
+python tests/send_alerts.py fixture sudo_privesc
+```
+
+Canonical single-event samples live in `tests/fixtures/` and double as
+regression fixtures for the correlation, enrichment, and agent phases.
+
+Verify alerts landed:
+
+```bash
+curl -s http://localhost:8000/api/v1/metrics | python3 -m json.tool
+docker exec soc-mongodb mongosh --quiet --eval \
+  "db=db.getSiblingDB('soc_platform'); db.cases.find().sort({created_at:-1}).limit(3).pretty()"
+```

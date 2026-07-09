@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-07-10T14:23:11.482+0000",
+  "rule": {
+    "level": 5,
+    "description": "sshd: authentication failed.",
+    "id": "5716",
+    "mitre": {
+      "id": ["T1110"],
+      "tactic": ["Credential Access"],
+      "technique": ["Brute Force"]
+    },
+    "firedtimes": 1,
+    "mail": false,
+    "groups": ["syslog", "sshd", "authentication_failed"],
+    "pci_dss": ["10.2.4", "10.2.5"],
+    "gdpr": ["IV_35.7.d", "IV_32.2"]
+  },
+  "agent": {
+    "id": "001",
+    "name": "victim-kali",
+    "ip": "10.0.0.50"
+  },
+  "manager": {
+    "name": "wazuh-manager"
+  },
+  "id": "1720621391.482310",
+  "full_log": "Jul 10 14:23:11 victim-kali sshd[12345]: Failed password for baduser from 10.0.0.99 port 54321 ssh2",
+  "predecoder": {
+    "program_name": "sshd",
+    "timestamp": "Jul 10 14:23:11",
+    "hostname": "victim-kali"
+  },
+  "decoder": {
+    "parent": "sshd",
+    "name": "sshd"
+  },
+  "data": {
+    "srcip": "10.0.0.99",
+    "srcport": "54321",
+    "dstuser": "baduser"
+  },
+  "location": "/var/log/auth.log"
+}
