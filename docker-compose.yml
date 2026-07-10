@@ -107,7 +107,7 @@ services:
   # ---------------------------------------------------------------------------
   ui:
     build:
-      context: ./ui
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: soc-ui
     ports:

@@ -31,7 +31,7 @@ Observability (Prometheus/Grafana) and mTLS are not yet wired in.
 - `agents/` — LangGraph agent pipeline (dispatcher, triage, investigation, verification, remediation, approval, reporting).
 - `rag/` — Qdrant-backed knowledge store + ingest script + MITRE/runbook data.
 - `api/` — read/query API + case actions powering the UI.
-- `ui/` — React + Vite + TypeScript + Tailwind dashboard.
+- `frontend/` — React + Vite + TypeScript + Tailwind dashboard.
 - `common/` — shared config, database clients, Pydantic models, pipeline worker.
 - `infrastructure/` — Wazuh stack, and (later) NGINX/PKI/Prometheus/Grafana.
 - `tests/` — the curl-based alert sender and fixtures.
@@ -104,7 +104,7 @@ Interactive API docs: **http://localhost:8080/docs**
 **Option A — dev mode (fast, shows build errors):**
 
 ```bash
-cd ui
+cd frontend
 npm install
 npm run dev
 ```
