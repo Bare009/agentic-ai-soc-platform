@@ -10,5 +10,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY common/ /app/common/
 COPY correlation/ /app/correlation/
 COPY enrichment/ /app/enrichment/
+COPY agents/ /app/agents/
 
 CMD ["python", "-m", "common.worker"]
