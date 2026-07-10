@@ -81,6 +81,43 @@ services:
       - soc-network
 
   # ---------------------------------------------------------------------------
+  # API Service — read/query API + case actions powering the dashboard UI
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: soc-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
+  # UI — React dashboard (nginx serving the built app, proxying /api)
+  # ---------------------------------------------------------------------------
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: soc-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
   # Pipeline Worker — reads from Redis, processes, writes to MongoDB
   # ---------------------------------------------------------------------------
   worker:

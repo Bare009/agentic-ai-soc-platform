@@ -132,6 +132,15 @@ async def worker_loop():
 
     while not _shutdown_event.is_set():
         try:
+            # Refresh liveness heartbeat so the API's System Health tab can tell
+            # the worker (a non-HTTP service) is alive. TTL is a few multiples of
+            # the stale threshold so the key disappears if the worker dies.
+            await redis.set(
+                settings.worker_heartbeat_key,
+                datetime.now(timezone.utc).isoformat(),
+                ex=settings.worker_heartbeat_stale_seconds * 3,
+            )
+
             # BRPOP blocks until an item is available (with timeout)
             result = await redis.brpop(
                 settings.redis_queue_key,

@@ -89,6 +89,15 @@ class Settings(BaseSettings):
 
     # --- Worker ---
     worker_poll_interval: float = 1.0  # seconds between Redis BRPOP calls
+    worker_heartbeat_key: str = "worker:heartbeat"  # Redis key the worker refreshes each loop
+    worker_heartbeat_stale_seconds: int = 20  # worker considered down if heartbeat older than this
+
+    # --- API / UI ---
+    api_cors_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description="CORS allowed origins for the read API (dev default: all)",
+    )
+    ingestion_health_url: str = "http://ingestion:8000/api/v1/health"
 
     model_config = {
         "env_prefix": "SOC_",
