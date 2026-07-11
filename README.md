@@ -18,7 +18,7 @@ alert (curl) → ingestion (FastAPI) → Redis → worker
 - **Enrichment** — AlienVault OTX reputation, asset criticality, historical case lookup.
 - **Agents** — LangGraph pipeline on Groq (Llama 3.3 70B) with a human approval gate for destructive actions.
 - **RAG** — Qdrant + FastEmbed knowledge base (MITRE ATT&CK techniques + response runbooks) grounding the agents.
-- **API** — FastAPI read/query service powering the UI (`:8080`).
+- **API** — FastAPI read/query service powering the UI (`:8081`).
 - **UI** — React dashboard with 7 tabs (`:3000` in Docker, `:5173` in dev).
 
 Observability (Prometheus/Grafana) and mTLS are not yet wired in.
@@ -93,11 +93,11 @@ curl -s http://localhost:6333/collections | python3 -m json.tool
 ### 4. Sanity-check the API
 
 ```bash
-curl -s http://localhost:8080/api/v1/health
-curl -s "http://localhost:8080/api/v1/system/health" | python3 -m json.tool | head -30
+curl -s http://localhost:8081/api/v1/health
+curl -s "http://localhost:8081/api/v1/system/health" | python3 -m json.tool | head -30
 ```
 
-Interactive API docs: **http://localhost:8080/docs**
+Interactive API docs: **http://localhost:8081/docs**
 
 ### 5. Start the UI
 
@@ -109,7 +109,7 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** (Vite proxies `/api` and the WebSocket to the API on `:8080`).
+Open **http://localhost:5173** (Vite proxies `/api` and the WebSocket to the API on `:8081`).
 
 **Option B — containerized (nginx):**
 
@@ -169,7 +169,7 @@ docker exec soc-mongodb mongosh --quiet --eval "db=db.getSiblingDB('soc_platform
 | UI (nginx) | 3000 | Docker build of the dashboard |
 | UI (Vite dev) | 5173 | `npm run dev`, proxies to API |
 | Ingestion API | 8000 | Wazuh webhook + health |
-| Read API | 8080 | Powers the UI; docs at `/docs` |
+| Read API | 8081 | Powers the UI; docs at `/docs` |
 | Qdrant | 6333 / 6334 | Vector store REST / gRPC |
 | Redis | 6380 | Host port (container 6379) |
 | MongoDB | 27018 | Host port (container 27017) |
@@ -184,7 +184,7 @@ docker exec soc-mongodb mongosh --quiet --eval "db=db.getSiblingDB('soc_platform
 
 - **Cases stuck before `reporting`, or verdict `unverified`** — the agent hit Groq rate limits and exhausted retries. Re-run with fewer alerts, or use a higher Groq tier.
 - **`otx_reputation: null` for a public IP** — OTX can be slow for heavily-referenced IPs; the first lookup per IP is cached. Internal `10.0.0.x` IPs are intentionally not looked up.
-- **UI shows no data** — confirm the API is healthy (`curl :8080/api/v1/health`) and that you've sent alerts (step 6).
+- **UI shows no data** — confirm the API is healthy (`curl :8081/api/v1/health`) and that you've sent alerts (step 6).
 - **Worker shows "down" in System Health** — the worker refreshes a Redis heartbeat each loop; if it's down, check `docker logs soc-worker`.
 
 ## Notes for contributors

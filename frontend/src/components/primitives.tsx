@@ -138,7 +138,7 @@ export function WindowTabs({
 }) {
   return (
     <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-      {WINDOWS.map((w) => (
+      {WINDOWS.map((w: string) => (
         <button
           key={w}
           onClick={() => onChange(w)}

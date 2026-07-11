@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 // The API base for local dev. In production the app is served by nginx which
 // proxies /api to the api service, so the frontend always uses relative /api.
-const API_TARGET = process.env.VITE_API_TARGET || "http://localhost:8080";
+const API_TARGET = process.env.VITE_API_TARGET || "http://localhost:8081";
 
 export default defineConfig({
   plugins: [react()],
