@@ -232,3 +232,11 @@ export interface LiveStats {
   model: string;
   timestamp: string;
 }
+
+export interface MtlsStatus {
+  client_cert_present: boolean;
+  verify: string;
+  common_name: string;
+  subject_dn: string;
+  behind_gateway: boolean;
+}

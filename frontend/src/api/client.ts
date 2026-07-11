@@ -9,6 +9,7 @@ import type {
   CorrelationPatterns,
   DashboardSummary,
   EnrichmentSummary,
+  MtlsStatus,
   ResolutionStats,
   SystemHealth,
 } from "./types";
@@ -86,6 +87,8 @@ export const Api = {
     api.get<CasePipeline>(`/agents/pipeline/${caseId}`).then((r) => r.data),
 
   systemHealth: () => api.get<SystemHealth>("/system/health").then((r) => r.data),
+
+  mtlsStatus: () => api.get<MtlsStatus>("/system/mtls").then((r) => r.data),
 
   alertVolume: (window: string) =>
     api.get<AlertVolume>("/analytics/alert-volume", { params: { window } }).then((r) => r.data),
