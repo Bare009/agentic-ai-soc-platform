@@ -125,6 +125,8 @@ services:
       context: .
       dockerfile: common/Dockerfile
     container_name: soc-worker
+    ports:
+      - "9100:9100"       # Prometheus metrics (standalone HTTP server)
     env_file:
       - .env
     depends_on:
@@ -137,6 +139,62 @@ services:
     networks:
       - soc-network
 
+  # ---------------------------------------------------------------------------
+  # Prometheus — scrapes /metrics from all application services + cAdvisor
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: soc-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - ingestion
+      - api
+      - worker
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
+  # Grafana — dashboards for infra + pipeline metrics (iframe-embedded in UI)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: soc-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_SERVER_ROOT_URL=http://localhost:3000/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - soc-network
+
+  # ---------------------------------------------------------------------------
+  # cAdvisor — container-level CPU, memory, network metrics for Prometheus
+  # ---------------------------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: soc-cadvisor
+    ports:
+      - "8082:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - soc-network
+
 # ---------------------------------------------------------------------------
 # Volumes & Networks
 # ---------------------------------------------------------------------------
@@ -144,6 +202,8 @@ volumes:
   redis-data:
   mongo-data:
   qdrant-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   # The main stack OWNS this network (fixed name so the separate Wazuh compose
@@ -152,3 +212,4 @@ networks:
   soc-network:
     name: soc-network
     driver: bridge
+

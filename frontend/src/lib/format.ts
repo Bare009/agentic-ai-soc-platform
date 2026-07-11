@@ -8,8 +8,7 @@ export function titleCase(str: string): string {
     .join(" ");
 }
 
-export function severityClasses(severity: string | n
-  umber): string {
+export function severityClasses(severity: string | number): string {
   const sev = String(severity).toLowerCase();
   if (sev === "critical" || sev === "high" || Number(sev) >= 8) {
     return "bg-rose-100 text-rose-800 border border-rose-200";

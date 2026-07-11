@@ -11,6 +11,7 @@ import json
 import logging
 import signal
 import sys
+import time
 from datetime import datetime, timezone
 
 from common.config import settings
@@ -24,6 +25,14 @@ from common.models import NormalizedAlert, EnrichedAlert, CaseDocument, CaseStat
 from correlation.engine import CorrelationEngine
 from enrichment.engine import EnrichmentEngine
 from agents.pipeline import build_pipeline, run_pipeline
+from common.metrics import (
+    ALERTS_DLQ,
+    CASES_TOTAL,
+    PIPELINE_DURATION,
+    set_redis_getter,
+    setup_http_metrics_server,
+    sync_refresh_queue_gauges,
+)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -65,6 +74,7 @@ async def process_alert(alert: NormalizedAlert) -> None:
     Correlation -> enrichment -> create case doc -> LangGraph agent pipeline.
     The agent pipeline updates the same case document in place as it progresses.
     """
+    start_time = time.perf_counter()
     db = get_mongo_db()
 
     # --- Correlation ---
@@ -98,17 +108,22 @@ async def process_alert(alert: NormalizedAlert) -> None:
     try:
         final_state = await run_pipeline(enriched, case.case_id)
         report = final_state.get("report")
+        verdict_label = report.verdict.value if report else "unknown"
         logger.info(
             "Case %s | pipeline done | stage=%s verdict=%s",
             case.case_id, final_state.get("current_stage", "?"),
-            report.verdict.value if report else "n/a",
+            verdict_label,
         )
+        CASES_TOTAL.labels(verdict=verdict_label).inc()
     except Exception as exc:  # noqa: BLE001 - never let one alert crash the loop
         logger.exception("Agent pipeline failed for case %s: %s", case.case_id, exc)
+        CASES_TOTAL.labels(verdict="error").inc()
         await db.cases.update_one(
             {"case_id": case.case_id},
             {"$set": {"status": CaseStatus.CLOSED.value, "pipeline_error": str(exc)}},
         )
+
+    PIPELINE_DURATION.observe(time.perf_counter() - start_time)
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +138,7 @@ async def worker_loop():
     the shutdown event regularly.
     """
     redis = await get_redis_client()
+    set_redis_getter(get_redis_client)
     db = get_mongo_db()
 
     logger.info(
@@ -166,11 +182,15 @@ async def worker_loop():
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
                 await redis.lpush(settings.redis_dlq_key, dlq_entry)
+                ALERTS_DLQ.inc()
                 logger.warning("Alert sent to DLQ: %s", settings.redis_dlq_key)
                 continue
 
             # Process through the pipeline
             await process_alert(alert)
+
+            # Refresh queue depth gauges for Prometheus scraping
+            sync_refresh_queue_gauges()
 
         except asyncio.CancelledError:
             logger.info("Worker loop cancelled")
@@ -188,6 +208,7 @@ async def main():
     logger.info("Starting SOC Pipeline Worker...")
 
     try:
+        setup_http_metrics_server(9100)
         await correlation_engine.initialize()
         await enrichment_engine.initialize()
         build_pipeline()  # compile the agent graph once up front

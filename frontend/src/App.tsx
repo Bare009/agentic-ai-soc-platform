@@ -7,6 +7,7 @@ import Enrichment from "./pages/Enrichment";
 import AgentOps from "./pages/AgentOps";
 import SystemHealth from "./pages/SystemHealth";
 import Analytics from "./pages/Analytics";
+import InfraMetrics from "./pages/InfraMetrics";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/enrichment" element={<Enrichment />} />
         <Route path="/agent-ops" element={<AgentOps />} />
         <Route path="/system-health" element={<SystemHealth />} />
+        <Route path="/infra-metrics" element={<InfraMetrics />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="*" element={<Dashboard />} />
       </Routes>

@@ -5,6 +5,7 @@ import {
   Bell,
   Bot,
   Database,
+  Gauge,
   LayoutDashboard,
   Share2,
   Shield,
@@ -17,6 +18,7 @@ const NAV = [
   { to: "/enrichment", label: "Enrichment", icon: Database },
   { to: "/agent-ops", label: "Agent Ops", icon: Bot },
   { to: "/system-health", label: "System Health", icon: Activity },
+  { to: "/infra-metrics", label: "Infra Metrics", icon: Gauge },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 

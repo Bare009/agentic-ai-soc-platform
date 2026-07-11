@@ -25,6 +25,7 @@ from api.routers import (
 )
 from common.config import settings
 from common.database import close_mongo, close_redis, get_redis_client
+from common.metrics import get_metrics_app, set_redis_getter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,6 +38,7 @@ logger = logging.getLogger("soc.api")
 async def lifespan(app: FastAPI):
     logger.info("AI_SOC API starting up...")
     await get_redis_client()
+    set_redis_getter(get_redis_client)
     yield
     logger.info("AI_SOC API shutting down...")
     await close_redis()
@@ -67,6 +69,9 @@ app.include_router(agents.router)
 app.include_router(system.router)
 app.include_router(analytics.router)
 app.include_router(ws.router)
+
+# Prometheus metrics
+app.mount("/metrics", get_metrics_app())
 
 
 @app.get("/api/v1/health", tags=["meta"])

@@ -36,14 +36,16 @@ logging.basicConfig(
 logger = logging.getLogger("soc.ingestion")
 
 # ---------------------------------------------------------------------------
-# Metrics (simple counters — Prometheus integration added in Phase 6)
+# Prometheus metrics
 # ---------------------------------------------------------------------------
 
-metrics = {
-    "alerts_received": 0,
-    "alerts_parsed": 0,
-    "alerts_dlq": 0,
-}
+from common.metrics import (
+    ALERTS_DLQ,
+    ALERTS_PARSED,
+    ALERTS_RECEIVED,
+    get_metrics_app,
+    set_redis_getter,
+)
 
 # ---------------------------------------------------------------------------
 # Lifespan (startup / shutdown)
@@ -56,6 +58,7 @@ async def lifespan(app: FastAPI):
     logger.info("Ingestion service starting up...")
     # Eagerly initialize connections to fail fast
     await get_redis_client()
+    set_redis_getter(get_redis_client)
     logger.info("Redis connected")
     yield
     logger.info("Ingestion service shutting down...")
@@ -195,17 +198,8 @@ async def health_check():
     return HealthResponse(status=status, redis=redis_ok, mongodb=mongo_ok)
 
 
-@app.get("/api/v1/metrics")
-async def get_metrics():
-    """Simple metrics endpoint (replaced by Prometheus in Phase 6)."""
-    redis = await get_redis_client()
-    queue_depth = await redis.llen(settings.redis_queue_key)
-    dlq_depth = await redis.llen(settings.redis_dlq_key)
-    return {
-        **metrics,
-        "queue_depth": queue_depth,
-        "dlq_depth": dlq_depth,
-    }
+# Mount Prometheus metrics endpoint
+app.mount("/metrics", get_metrics_app())
 
 
 @app.post("/api/v1/alerts/wazuh", status_code=202)
@@ -226,7 +220,7 @@ async def receive_wazuh_alert(
     if authorization != expected:
         raise HTTPException(status_code=401, detail="Invalid or missing auth token")
 
-    metrics["alerts_received"] += 1
+    ALERTS_RECEIVED.inc()
     redis = await get_redis_client()
 
     # --- Parse the raw body ---
@@ -234,7 +228,7 @@ async def receive_wazuh_alert(
         body = await request.json()
     except Exception as exc:
         logger.error("Failed to read request body: %s", exc)
-        metrics["alerts_dlq"] += 1
+        ALERTS_DLQ.inc()
         await redis.lpush(
             settings.redis_dlq_key,
             json.dumps({
@@ -249,7 +243,7 @@ async def receive_wazuh_alert(
         normalized = normalize_wazuh_alert(body)
     except Exception as exc:
         logger.error("Failed to normalize Wazuh alert: %s", exc)
-        metrics["alerts_dlq"] += 1
+        ALERTS_DLQ.inc()
         await redis.lpush(
             settings.redis_dlq_key,
             json.dumps({
@@ -263,7 +257,7 @@ async def receive_wazuh_alert(
     # --- Push to Redis queue ---
     alert_json = normalized.model_dump_json()
     await redis.lpush(settings.redis_queue_key, alert_json)
-    metrics["alerts_parsed"] += 1
+    ALERTS_PARSED.inc()
 
     logger.info(
         "Alert ingested: id=%s src_ip=%s user=%s host=%s rule='%s' level=%d",

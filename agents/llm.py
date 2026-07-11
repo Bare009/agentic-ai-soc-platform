@@ -25,6 +25,7 @@ from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
 from common.config import settings
+from common.metrics import LLM_CALLS
 
 logger = logging.getLogger("soc.agents.llm")
 
@@ -97,11 +98,14 @@ async def with_retry(factory: Callable[[], Awaitable[T]], *, what: str = "llm ca
 
     for attempt in range(1, attempts + 1):
         try:
-            return await factory()
+            result = await factory()
+            LLM_CALLS.labels(agent=what, outcome="success").inc()
+            return result
         except Exception as exc:  # noqa: BLE001 - classified below
             last_exc = exc
             if not _is_retryable(exc) or attempt >= attempts:
                 logger.error("%s failed (attempt %d/%d): %r", what, attempt, attempts, exc)
+                LLM_CALLS.labels(agent=what, outcome="failure").inc()
                 raise
             delay = _retry_after_seconds(exc)
             if delay is None:
