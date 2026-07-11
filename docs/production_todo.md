@@ -67,3 +67,21 @@ current behavior is correct, these make it production-grade. Grouped by phase.
   from the Docker bridge on this host; resolved on retry. If it recurs
   persistently, revisit container DNS (`dns:` on services) or MTU
   (`com.docker.network.driver.mtu` on `soc-network`).
+
+## Phase 7 — TLS / mTLS gateway
+
+### 7. Close the direct service ports in production
+- **Where:** `docker-compose.yml` (host port mappings on `api`, `ui`, `ingestion`, `grafana`, etc.)
+- **What:** The mTLS gateway (`:443`) only adds a real security boundary if the
+  backend isn't independently reachable. Today `api` (`:8081`), `ui` (`:3000`),
+  and others are exposed directly and bypass the gateway.
+- **Action:** For a hardened deployment, drop those host port mappings (or bind
+  them to `127.0.0.1`) so the gateway is the only ingress. Kept open now for
+  local development convenience.
+
+### 8. Rotate CA/keys and pin certificate lifetimes
+- **Where:** `infrastructure/pki/generate_certs.sh`
+- **What:** Demo uses a long-lived self-signed CA and a shared analyst cert with
+  a well-known `.p12` password.
+- **Action:** For production, issue per-analyst client certs, shorten lifetimes,
+  protect the CA key, and integrate revocation (CRL/OCSP).

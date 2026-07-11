@@ -162,10 +162,57 @@ docker exec soc-mongodb mongosh --quiet --eval "db=db.getSiblingDB('soc_platform
 
 ---
 
+## Secure access — TLS + mTLS gateway (Phase 7)
+
+An nginx edge gateway (`soc-gateway`) is the single HTTPS entrypoint on port 443. It terminates TLS and enforces **mutual TLS (a client certificate)** on the destructive analyst actions (`approve` / `reject`) — the human-approval gate — while the dashboard, read APIs, live WebSocket, and Grafana stay open over plain TLS.
+
+### 1. Generate the PKI (once per machine)
+
+```bash
+bash infrastructure/pki/generate_certs.sh
+```
+
+Creates a root CA, the gateway server cert, and an analyst client cert + `analyst.p12` (browser-import password: `analyst`) under `infrastructure/pki/`. These are git-ignored — never committed.
+
+### 2. Start the gateway
+
+```bash
+docker compose up -d --build gateway
+```
+
+Browse to **https://localhost** (trust `infrastructure/pki/ca.crt`, or accept the self-signed warning). The direct dev ports (`:3000`, `:8081`, `:3001`, …) still work but are unauthenticated conveniences — in production only the gateway would be exposed.
+
+### 3. mTLS in action
+
+```bash
+# reads work over TLS with no client cert
+curl --cacert infrastructure/pki/ca.crt https://localhost/api/v1/health
+
+# approving a destructive action WITHOUT a client cert is blocked at the gateway
+curl --cacert infrastructure/pki/ca.crt -X POST \
+  https://localhost/api/v1/cases/<case_id>/approve            # -> 403
+
+# WITH the analyst client cert it succeeds
+curl --cacert infrastructure/pki/ca.crt \
+  --cert infrastructure/pki/analyst.crt --key infrastructure/pki/analyst.key \
+  -X POST https://localhost/api/v1/cases/<case_id>/approve    # -> 200
+```
+
+Or run the full scripted demo (alice + bob + the mTLS proof, auto-picking a pending case):
+
+```bash
+bash tests/demo_attack.sh
+```
+
+To approve from the **browser UI** over the gateway, import `infrastructure/pki/analyst.p12` (password `analyst`) into your browser's personal certificates; the browser offers it when the gateway requests a client cert.
+
+---
+
 ## Ports
 
 | Service | Port | Notes |
 |---|---|---|
+| Gateway (HTTPS) | 443 / 80 | mTLS edge — the secure entrypoint (Phase 7) |
 | UI (nginx) | 3000 | Docker build of the dashboard |
 | UI (Vite dev) | 5173 | `npm run dev`, proxies to API |
 | Ingestion API | 8000 | Wazuh webhook + health |
