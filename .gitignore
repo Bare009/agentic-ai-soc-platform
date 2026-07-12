@@ -161,3 +161,12 @@ cython_debug/
 
 # VS Code
 .vscode/
+
+# TLS / mTLS material (Phase 7) — NEVER commit private keys or certificates.
+# The generator script (generate_certs.sh) is tracked; its output is not.
+infrastructure/pki/*.key
+infrastructure/pki/*.crt
+infrastructure/pki/*.csr
+infrastructure/pki/*.p12
+infrastructure/pki/*.ext
+infrastructure/pki/*.srl

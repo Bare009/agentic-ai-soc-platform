@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Check, ThumbsDown, X } from "lucide-react";
+import { Check, Lock, ShieldAlert, ThumbsDown, X } from "lucide-react";
 import { Api } from "../api/client";
 import { useApi } from "../hooks/useApi";
 import type { CaseDetail } from "../api/types";
@@ -46,15 +46,30 @@ export default function CaseDrawer({
     [caseId]
   );
   const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   if (!caseId) return null;
 
-  const act = async (fn: () => Promise<unknown>) => {
+  const act = async (fn: () => Promise<unknown>, successMsg: string) => {
     setBusy(true);
+    setResult(null);
     try {
       await fn();
+      setResult({ ok: true, msg: successMsg });
       refresh();
       onActioned?.();
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        setResult({
+          ok: false,
+          msg: "Blocked by mTLS — a valid analyst client certificate is required to authorize this action.",
+        });
+      } else {
+        setResult({
+          ok: false,
+          msg: err?.response?.data?.detail || err?.message || "Action failed.",
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -252,32 +267,56 @@ export default function CaseDrawer({
         )}
 
         {/* actions */}
-        <div className="flex items-center gap-2 border-t border-slate-200 px-5 py-3">
-          {isPending && (
-            <>
-              <button
-                disabled={busy}
-                onClick={() => act(() => Api.approveCase(caseId))}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                <Check className="h-4 w-4" /> Approve
-              </button>
-              <button
-                disabled={busy}
-                onClick={() => act(() => Api.rejectCase(caseId))}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-              >
-                <X className="h-4 w-4" /> Reject
-              </button>
-            </>
+        <div className="border-t border-slate-200 px-5 py-3">
+          {result && (
+            <div
+              className={`mb-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${
+                result.ok
+                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                  : "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+              }`}
+            >
+              {result.ok ? (
+                <Check className="mt-0.5 h-4 w-4 shrink-0" />
+              ) : (
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              )}
+              <span>{result.msg}</span>
+            </div>
           )}
-          <button
-            disabled={busy}
-            onClick={() => act(() => Api.submitFeedback(caseId, "false_positive", "Marked FP from UI"))}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <ThumbsDown className="h-4 w-4" /> Mark FP
-          </button>
+          <div className="flex items-center gap-2">
+            {isPending && (
+              <>
+                <button
+                  disabled={busy}
+                  onClick={() => act(() => Api.approveCase(caseId), "Case approved — remediation authorized.")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" /> Approve
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => act(() => Api.rejectCase(caseId), "Case rejected — no action taken.")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" /> Reject
+                </button>
+                <span
+                  className="flex items-center gap-1 text-xs text-slate-400"
+                  title="These actions require a valid analyst client certificate (mTLS) at the gateway"
+                >
+                  <Lock className="h-3 w-3" /> mTLS-protected
+                </span>
+              </>
+            )}
+            <button
+              disabled={busy}
+              onClick={() => act(() => Api.submitFeedback(caseId, "false_positive", "Marked FP from UI"), "Feedback recorded.")}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <ThumbsDown className="h-4 w-4" /> Mark FP
+            </button>
+          </div>
         </div>
       </div>
     </div>
